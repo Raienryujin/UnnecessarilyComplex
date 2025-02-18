@@ -11,21 +11,23 @@
 #include <cstdlib>
 #include <ctime>
 #include <map>
-#include <random>
 
 class ObfuscatedStringGenerator {
 private:
     std::vector<std::function<char(int)>> charGenerators;
     std::map<int, int> targetChars;
 
-    void initializeTargetChars() {
-        const std::string target = "how dare you";
-        for(int i = 0; i < static_cast<int>(target.length()); ++i) {
-            targetChars[i] = static_cast<int>(target[i]);
-        }
-    }
+public:
+    ObfuscatedStringGenerator() {
 
-    void createCharGenerators() {
+        const std::vector<int> encodedTarget = {104, 111, 119, 32, 100, 97, 114, 101, 32, 121, 111, 117};
+
+        // Initialize mapping
+        for(int i = 0; i < static_cast<int>(encodedTarget.size()); ++i) {
+            targetChars[i] = encodedTarget[i];
+        }
+
+
         charGenerators = {
             [this](int x) { return static_cast<char>(targetChars.at(0)); },
             [this](int x) { return static_cast<char>(targetChars.at(1)); },
@@ -40,12 +42,6 @@ private:
             [this](int x) { return static_cast<char>(targetChars.at(10)); },
             [this](int x) { return static_cast<char>(targetChars.at(11)); }
         };
-    }
-
-public:
-    ObfuscatedStringGenerator() {
-        initializeTargetChars();
-        createCharGenerators();
     }
 
     std::string generate() {
@@ -110,37 +106,6 @@ auto make_meta_range() {
     }
 }
 
-class CrypticPrinter {
-private:
-    std::vector<std::thread> threads;
-    std::vector<char> buffer;
-
-    void printChar(char c, int delay) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-        putchar(c);
-        fflush(stdout);
-    }
-
-public:
-    CrypticPrinter(const std::string& str, int metaVal) : buffer(str.size()) {
-        for (size_t i = 0; i < str.size(); ++i) {
-            threads.emplace_back([this, &str, i, metaVal]() {
-                buffer[i] = str[i];
-            });
-        }
-
-        for (auto& thread : threads) {
-            thread.join();
-        }
-
-        for (char c : buffer) {
-            printChar(c, rand() % 50);
-        }
-
-        putchar('\n');
-    }
-};
-
 int main() {
     std::srand(static_cast<unsigned>(std::time(nullptr)));
 
@@ -160,7 +125,37 @@ int main() {
                               [](int acc, int val) { return acc ^ (val << 2); });
     }();
 
-    CrypticPrinter(result, metaValue);
+    struct {
+        void operator()(const std::string& str, int metaVal) {
+            std::vector<std::thread> threads;
+            std::vector<char> buffer(str.size());
+
+            for (size_t i = 0; i < str.size(); ++i) {
+                threads.emplace_back([&buffer, &str, i, metaVal]() {
+                    // Ensure the original character is preserved
+                    buffer[i] = str[i];
+                });
+            }
+
+            for (auto& thread : threads) {
+                thread.join();
+            }
+
+            auto printChar = [](char c, int delay) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+                putchar(c);
+                fflush(stdout);
+            };
+
+            for (char c : buffer) {
+                printChar(c, rand() % 50);
+            }
+
+            putchar('\n');
+        }
+    } crypticPrinter;
+
+    crypticPrinter(result, metaValue);
 
     return 0;
 }
